@@ -1,6 +1,5 @@
 package org.example;
 
-import java.util.Comparator;
 import java.util.stream.StreamSupport;
 
 public class App {
@@ -35,7 +34,7 @@ public class App {
         assert map.size() == 50;
 
         StreamSupport.stream(map.spliterator(), false)
-                .sorted(Comparator.comparing(MyHashMap.Entry::value))
+                .sorted(java.util.Map.Entry.comparingByValue())
                 .forEach(System.out::println);
     }
 }

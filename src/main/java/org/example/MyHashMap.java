@@ -1,43 +1,52 @@
 package org.example;
 
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
-public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
+public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<AbstractMap.SimpleEntry<K, V>> {
     private static final int INITIAL_CAPACITY = 16;
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
-    public record Entry<K, V>(K key, V value) {
-
+    @Override
+    public Set<Map.Entry<K, V>> entrySet() {
+        return StreamSupport.stream(spliterator(), false)
+                .collect(Collectors.toUnmodifiableSet());
     }
 
-    private record Bucket<K, V>(LinkedList<Entry<K, V>> chain) {
+    private record Bucket<K, V>(LinkedList<SimpleEntry<K, V>> chain) {
         public Bucket() {
             this(new LinkedList<>());
         }
 
-        private Entry<K, V> findEntry(Object key, Consumer<ListIterator<Entry<K, V>>> action) {
-            for (ListIterator<Entry<K, V>> it = chain.listIterator(); it.hasNext();) {
-                Entry<K, V> entry = it.next();
-                if (key.hashCode() == entry.key.hashCode() && key.equals(entry.key)) {
-                    action.accept(it);
+        private SimpleEntry<K, V> findEntry(Object key, boolean removeOnFound) {
+            for (ListIterator<SimpleEntry<K, V>> it = chain.listIterator(); it.hasNext();) {
+                SimpleEntry<K, V> entry = it.next();
+                if (key.hashCode() == entry.getKey().hashCode() && key.equals(entry.getKey())) {
+                    if (removeOnFound) {
+                        it.remove();
+                    }
                     return entry;
                 }
             }
             return null;
         }
 
-        public Entry<K, V> getEntry(Object key) {
-            return findEntry(key, _ -> {});
+        public SimpleEntry<K, V> getEntry(Object key) {
+            return findEntry(key, false);
         }
 
-        public Entry<K, V> setEntry(K key, V value) {
-            return findEntry(key, it -> it.set(new Entry<>(key, value)));
+        public SimpleEntry<K, V> setEntry(K key, V value) {
+            SimpleEntry<K, V> entry = findEntry(key, false);
+            if (entry != null) {
+               entry.setValue(value);
+            }
+            return entry;
         }
 
-        public Entry<K, V> removeEntry(Object key) {
-            return findEntry(key, ListIterator::remove);
+        public SimpleEntry<K, V> removeEntry(Object key) {
+            return findEntry(key, true);
         }
     }
 
@@ -82,8 +91,8 @@ public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
         }
 
         Bucket<K, V> bucket = getBucketWith(key);
-        Entry<K, V> entry = bucket.getEntry(key);
-        return entry == null ? null : entry.value;
+        SimpleEntry<K, V> entry = bucket.getEntry(key);
+        return entry == null ? null : entry.getValue();
     }
 
     @SuppressWarnings("UnusedReturnValue")
@@ -96,12 +105,12 @@ public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
         }
 
         Bucket<K, V> bucket = getBucketWith(key);
-        Entry<K, V> entry = bucket.setEntry(key, value);
+        SimpleEntry<K, V> entry = bucket.setEntry(key, value);
         if (entry != null) {
-            return entry.value;
+            return entry.getValue();
         }
 
-        bucket.chain.addLast(new Entry<>(key, value));
+        bucket.chain.addLast(new SimpleEntry<>(key, value));
         ++size;
 
         return null;
@@ -114,16 +123,16 @@ public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
         }
 
         Bucket<K, V> bucket = getBucketWith(key);
-        Entry<K, V> entry = bucket.removeEntry(key);
+        SimpleEntry<K, V> entry = bucket.removeEntry(key);
         if (entry != null) {
             --size;
-            return entry.value;
+            return entry.getValue();
         }
         return null;
     }
 
     @Override
-    public Iterator<Entry<K, V>> iterator() {
+    public Iterator<SimpleEntry<K, V>> iterator() {
         return new Iterator<>() {
             private int bucketNum;
             private int nextEntryNum;
@@ -147,7 +156,7 @@ public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
             }
 
             @Override
-            public Entry<K, V> next() {
+            public SimpleEntry<K, V> next() {
                 if (buckets.length == 0) {
                     throw new NoSuchElementException();
                 }
@@ -186,8 +195,8 @@ public class MyHashMap<K, V> implements Iterable<MyHashMap.Entry<K, V>> {
         buckets = allocateBuckets(capacity);
 
         for (Bucket<K, V> bucket : oldBuckets) {
-            for (Entry<K, V> entry : bucket.chain) {
-                put(entry.key, entry.value);
+            for (SimpleEntry<K, V> entry : bucket.chain) {
+                put(entry.getKey(), entry.getValue());
             }
         }
     }
