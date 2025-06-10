@@ -28,6 +28,24 @@ public class App {
 
         assert map.get("999") == null;
 
+        assert map.put(null, 1) == null;
+        assert map.size() == 101;
+
+        assert map.put(null, 2) == 1;
+        assert map.size() == 101;
+
+        assert map.remove(null) == 2;
+        assert map.size() == 100;
+
+        assert map.put(null, null) == null;
+        assert map.size() == 101;
+
+        assert map.get(null) == null;
+        assert map.put(null, 3) == null;
+        assert map.size() == 101;
+        assert map.remove(null) == 3;
+        assert map.size() == 100;
+
         for (int i = 0; i < 50; ++i) {
             map.remove(String.valueOf(i * 2));
         }

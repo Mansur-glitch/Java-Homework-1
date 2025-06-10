@@ -15,15 +15,22 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
                 .collect(Collectors.toUnmodifiableSet());
     }
 
-    private record Bucket<K, V>(LinkedList<SimpleEntry<K, V>> chain) {
-        public Bucket() {
-            this(new LinkedList<>());
-        }
+    private static class Bucket<K, V> {
+        private final LinkedList<SimpleEntry<K, V>> chain = new LinkedList<>();
 
         private SimpleEntry<K, V> findEntry(Object key, boolean removeOnFound) {
             for (ListIterator<SimpleEntry<K, V>> it = chain.listIterator(); it.hasNext();) {
                 SimpleEntry<K, V> entry = it.next();
-                if (key.hashCode() == entry.getKey().hashCode() && key.equals(entry.getKey())) {
+                boolean found = false;
+
+                if (key == null || entry.getKey() == null) {
+                    if (key == entry.getKey()) {
+                        found = true;
+                    }
+                } else if (key.hashCode() == entry.getKey().hashCode() && key.equals(entry.getKey())) {
+                    found = true;
+                }
+                if (found) {
                     if (removeOnFound) {
                         it.remove();
                     }
@@ -39,10 +46,12 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
 
         public SimpleEntry<K, V> setEntry(K key, V value) {
             SimpleEntry<K, V> entry = findEntry(key, false);
+            SimpleEntry<K, V> oldEntry = null;
             if (entry != null) {
-               entry.setValue(value);
+                oldEntry = new SimpleEntry<>(entry);
+                entry.setValue(value);
             }
-            return entry;
+            return oldEntry;
         }
 
         public SimpleEntry<K, V> removeEntry(Object key) {
@@ -85,29 +94,22 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
         return (float) size / buckets.length;
     }
 
-    public V get(Object key) throws NullPointerException{
-        if (key == null) {
-            throw new NullPointerException();
-        }
-
+    public V get(Object key) {
         Bucket<K, V> bucket = getBucketWith(key);
         SimpleEntry<K, V> entry = bucket.getEntry(key);
         return entry == null ? null : entry.getValue();
     }
 
     @SuppressWarnings("UnusedReturnValue")
-    public V put(K key, V value) throws NullPointerException {
-        if (key == null || value == null) {
-            throw new NullPointerException();
-        }
+    public V put(K key, V value) {
         if (currentLoad() > loadFactor) {
             reallocate();
         }
 
         Bucket<K, V> bucket = getBucketWith(key);
-        SimpleEntry<K, V> entry = bucket.setEntry(key, value);
-        if (entry != null) {
-            return entry.getValue();
+        SimpleEntry<K, V> oldEntry = bucket.setEntry(key, value);
+        if (oldEntry != null) {
+            return oldEntry.getValue();
         }
 
         bucket.chain.addLast(new SimpleEntry<>(key, value));
@@ -117,11 +119,7 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
     }
 
     @SuppressWarnings("UnusedReturnValue")
-    public V remove(Object key) throws NullPointerException {
-        if (key == null) {
-            throw new NullPointerException();
-        }
-
+    public V remove(Object key) {
         Bucket<K, V> bucket = getBucketWith(key);
         SimpleEntry<K, V> entry = bucket.removeEntry(key);
         if (entry != null) {
@@ -136,6 +134,19 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
         return new Iterator<>() {
             private int bucketNum;
             private int nextEntryNum;
+            private boolean removedFlag;
+
+            @Override
+            public void remove() {
+               if (nextEntryNum == 0) {
+                   throw new IllegalStateException("next() method hasn't been called yet");
+               }
+               if (removedFlag) {
+                   throw new IllegalStateException("Attempt to repeatedly remove same object");
+               }
+               buckets[bucketNum].chain.remove(--nextEntryNum);
+               removedFlag = true;
+            }
 
             @Override
             public boolean hasNext() {
@@ -182,8 +193,11 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
     }
 
     private Bucket<K, V> getBucketWith(Object key) {
+        if (key == null) {
+            return buckets[0];
+        }
         int hash = key.hashCode();
-        int bucketNum = hash % capacity;
+        int bucketNum = (hash & Integer.MAX_VALUE) % capacity;
         return buckets[bucketNum];
     }
 
