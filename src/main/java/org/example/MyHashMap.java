@@ -174,10 +174,12 @@ public class MyHashMap<K, V> extends AbstractMap<K, V> implements Iterable<Abstr
 
                 Bucket<K, V> currentBucket = buckets[bucketNum];
                 if (nextEntryNum < currentBucket.chain.size()) {
+                    removedFlag = false;
                     return currentBucket.chain.get(nextEntryNum++);
                 }
                 for (int i = bucketNum + 1; i < capacity; ++i) {
                     if (! buckets[i].chain.isEmpty()) {
+                        removedFlag = false;
                         bucketNum = i;
                         nextEntryNum = 1;
                         return buckets[i].chain.getFirst();
